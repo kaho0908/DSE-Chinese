@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中文範文試卷生成器</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: "PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif;
+    margin: 0; padding: 0; background: #f4f4f4; color: #222;
+    font-size: 15px;
+  }
+  header {
+    background: #2c3e50; color: white; padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { margin: 0; font-size: 18px; flex: 1; min-width: 200px; }
+  #user-info { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  #user-info img { width: 28px; height: 28px; border-radius: 50%; }
+  nav { display: flex; gap: 6px; width: 100%; overflow-x: auto; }
+  nav button {
+    background: #34495e; color: white; border: none; padding: 10px 14px;
+    border-radius: 4px; cursor: pointer; font-size: 14px; white-space: nowrap;
+  }
+  nav button.active { background: #1abc9c; }
+  main { max-width: 1100px; margin: 16px auto; padding: 0 12px; }
+  .tab { display: none; background: white; padding: 16px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .tab.active { display: block; }
+  h2 { margin-top: 0; color: #2c3e50; border-bottom: 2px solid #1abc9c; padding-bottom: 8px; font-size: 18px; }
+  h3 { color: #34495e; margin-top: 20px; font-size: 16px; }
+  label { display: block; margin-top: 12px; font-weight: 600; color: #444; font-size: 14px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;
+    font-family: inherit; font-size: 15px; margin-top: 4px;
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  .btn {
+    background: #1abc9c; color: white; border: none; padding: 12px 20px;
+    border-radius: 4px; cursor: pointer; font-size: 15px; margin-top: 12px;
+    min-height: 44px;
+  }
+  .btn:hover { background: #16a085; }
+  .btn-danger { background: #e74c3c; }
+  .btn-danger:hover { background: #c0392b; }
+  .btn-secondary { background: #95a5a6; }
+  .btn-secondary:hover { background: #7f8c8d; }
+  .btn-google {
+    background: white; color: #444; border: 1px solid #ddd;
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 24px; font-size: 16px;
+  }
+  .checkbox-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; margin-top: 8px; }
+  .checkbox-group label { display: flex; align-items: center; gap: 8px; font-weight: normal; margin-top: 0; padding: 8px; background: #f9f9f9; border-radius: 4px; cursor: pointer; }
+  .checkbox-group input { width: 20px; height: 20px; }
+  .question-item {
+    background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;
+    padding: 12px; margin-bottom: 8px;
+  }
+  .question-item .meta { font-size: 12px; color: #777; margin-bottom: 4px; }
+  .question-item .actions { margin-top: 8px; }
+  .question-item .actions button {
+    background: none; border: 1px solid #ccc; padding: 6px 12px; border-radius: 3px;
+    cursor: pointer; font-size: 13px; margin-right: 4px;
+  }
+  .mark-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  .mark-table th, .mark-table td { padding: 8px 6px; border: 1px solid #ddd; text-align: left; }
+  .mark-table th { background: #ecf0f1; }
+  .mark-table input { width: 70px; padding: 6px; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: 12px; background: #1abc9c; color: white; margin-right: 4px;
+  }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 12px 0; }
+  .stats { background: #ecf0f1; padding: 8px 12px; border-radius: 4px; font-size: 13px; }
+  .options-input { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .options-input span { font-weight: 600; min-width: 24px; }
+  .sync-status { font-size: 12px; color: #888; margin-left: 8px; }
+  .sync-status.saving { color: #f39c12; }
+  .sync-status.saved { color: #27ae60; }
+
+  /* 登入畫面 */
+  #auth-screen {
+    min-height: 80vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 40px 20px; text-align: center;
+  }
+  #auth-screen h1 { color: #2c3e50; }
+  #auth-screen p { color: #666; max-width: 400px; }
+
+  /* 設定錯誤畫面 */
+  #setup-screen {
+    background: #fff3cd; border: 1px solid #ffc107; padding: 24px;
+    border-radius: 6px; margin: 24px;
+  }
+  #setup-screen pre {
+    background: #f4f4f4; padding: 12px; border-radius: 4px;
+    overflow-x: auto; font-size: 13px;
+  }
+
+  /* 試卷預覽／列印樣式 */
+  #paper-output { background: white; padding: 24px; margin-top: 16px; border: 1px solid #ddd; min-height: 300px; }
+  .paper-header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 20px; }
+  .paper-header h1 { margin: 0 0 8px 0; font-size: 20px; }
+  .paper-info { display: flex; justify-content: space-between; font-size: 14px; margin-top: 8px; flex-wrap: wrap; gap: 8px; }
+  .paper-section { margin-top: 24px; }
+  .paper-section h2 { font-size: 16px; border-bottom: 1px solid #888; padding-bottom: 4px; }
+  .paper-question { margin: 16px 0; line-height: 1.8; }
+  .paper-question .q-num { font-weight: 600; }
+  .paper-question .q-marks { color: #555; font-size: 13px; margin-left: 8px; }
+  .paper-answer-space { border-bottom: 1px solid #ccc; margin: 8px 0; height: 28px; }
+  .paper-options { margin: 6px 0 0 24px; }
+  .paper-options div { margin: 4px 0; }
+
+  /* 手機優化 */
+  @media (max-width: 600px) {
+    header h1 { font-size: 16px; }
+    .mark-table { font-size: 12px; }
+    .mark-table input { width: 50px; padding: 4px; }
+    #paper-output { padding: 16px; }
+    .paper-info { flex-direction: column; gap: 4px; }
+  }
+
+  @media print {
+    body { background: white; }
+    header, nav, .no-print { display: none !important; }
+    main { max-width: 100%; margin: 0; padding: 0; }
+    .tab { box-shadow: none; padding: 0; }
+    #paper-output { border: none; padding: 0; margin: 0; }
+    .page-break { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 設定未完成提示 -->
+<div id="setup-screen" style="display:none;">
+  <h2>⚙️ 需要先完成 Firebase 設定</h2>
+  <p>請打開呢個 HTML 檔，搵到底部 <code>FIREBASE_CONFIG</code> 嗰段，將你 Firebase Console 嘅 config 填入。詳細步驟請參考設定指引文件。</p>
+</div>
+
+<!-- 登入畫面 -->
+<div id="auth-screen" style="display:none;">
+  <h1>📝 中文範文試卷生成器</h1>
+  <p>請用 Google 帳號登入，題庫會自動雲端同步到你所有裝置</p>
+  <button class="btn btn-google" onclick="loginWithGoogle()">
+    <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571.001-.001.002-.001.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+    用 Google 登入
+  </button>
+</div>
+
+<!-- 主程式 -->
+<div id="app" style="display:none;">
+
+<header>
+  <h1>📝 中文範文試卷生成器</h1>
+  <div id="user-info"></div>
+  <nav class="no-print">
+    <button class="tab-btn active" data-tab="bank">題庫管理</button>
+    <button class="tab-btn" data-tab="generate">出卷</button>
+    <button class="tab-btn" data-tab="data">設定</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ============ 題庫管理 ============ -->
+<section id="tab-bank" class="tab active">
+  <h2>新增題目 <span class="sync-status" id="sync-status"></span></h2>
+
+  <label>所屬範文</label>
+  <select id="q-source"></select>
+
+  <label>題型</label>
+  <select id="q-type" onchange="renderQuestionForm()">
+    <option value="translate">語譯</option>
+    <option value="judge">三式判斷題</option>
+    <option value="mc">多項選擇題</option>
+    <option value="short">單答題</option>
+    <option value="long">複答題</option>
+  </select>
+
+  <div id="q-form"></div>
+
+  <button class="btn" onclick="saveQuestion()">儲存題目</button>
+  <button class="btn btn-secondary" onclick="clearForm()">清除</button>
+
+  <h2 style="margin-top: 32px;">題庫總覽</h2>
+  <div class="toolbar">
+    <span class="stats" id="bank-stats">題目總數：0</span>
+    <select id="filter-source" onchange="renderBank()" style="flex:1; min-width:150px;">
+      <option value="">全部範文</option>
+    </select>
+    <select id="filter-type" onchange="renderBank()" style="flex:1; min-width:150px;">
+      <option value="">全部題型</option>
+      <option value="translate">語譯</option>
+      <option value="judge">三式判斷題</option>
+      <option value="mc">多項選擇題</option>
+      <option value="short">單答題</option>
+      <option value="long">複答題</option>
+    </select>
+  </div>
+  <div id="bank-list"></div>
+</section>
+
+<!-- ============ 出卷 ============ -->
+<section id="tab-generate" class="tab">
+  <h2>出卷設定</h2>
+
+  <label>試卷標題</label>
+  <input type="text" id="paper-title" value="中文卷一甲部 範文閱讀練習">
+
+  <label>選擇範圍（範文）</label>
+  <div class="checkbox-group" id="source-checkboxes"></div>
+  <div class="toolbar no-print" style="margin-top: 8px;">
+    <button class="btn btn-secondary" onclick="toggleAllSources(true)">全選</button>
+    <button class="btn btn-secondary" onclick="toggleAllSources(false)">全部取消</button>
+  </div>
+
+  <h3>各題型分數設定</h3>
+  <p style="font-size: 13px; color: #666;">「題數=0」即唔抽嗰種題型。</p>
+  <div style="overflow-x: auto;">
+  <table class="mark-table">
+    <thead>
+      <tr><th>題型</th><th>題數</th><th>每題分數</th><th>小計</th><th>可用</th></tr>
+    </thead>
+    <tbody id="mark-allocation">
+      <tr data-type="translate">
+        <td>語譯</td>
+        <td><input type="number" min="0" value="2" oninput="updateAllocation()"></td>
+        <td><input type="number" min="0" value="4" oninput="updateAllocation()"></td>
+        <td class="subtotal">8</td>
+        <td class="available">0</td>
+      </tr>
+      <tr data-type="judge">
+        <td>三式判斷題</td>
+        <td><input type="number" min="0" value="3" oninput="updateAllocation()"></td>
+        <td><input type="number" min="0" value="2" oninput="updateAllocation()"></td>
+        <td class="subtotal">6</td>
+        <td class="available">0</td>
+      </tr>
+      <tr data-type="mc">
+        <td>多項選擇題</td>
+        <td><input type="number" min="0" value="3" oninput="updateAllocation()"></td>
+        <td><input type="number" min="0" value="2" oninput="updateAllocation()"></td>
+        <td class="subtotal">6</td>
+        <td class="available">0</td>
+      </tr>
+      <tr data-type="short">
+        <td>單答題</td>
+        <td><input type="number" min="0" value="3" oninput="updateAllocation()"></td>
+        <td><input type="number" min="0" value="3" oninput="updateAllocation()"></td>
+        <td class="subtotal">9</td>
+        <td class="available">0</td>
+      </tr>
+      <tr data-type="long">
+        <td>複答題</td>
+        <td><input type="number" min="0" value="2" oninput="updateAllocation()"></td>
+        <td><input type="number" min="0" value="6" oninput="updateAllocation()"></td>
+        <td class="subtotal">12</td>
+        <td class="available">0</td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr><th colspan="3" style="text-align:right;">總分</th><th id="total-marks">41</th><th></th></tr>
+    </tfoot>
+  </table>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn" onclick="generatePaper()">🎲 隨機抽題生成試卷</button>
+    <button class="btn btn-secondary" onclick="window.print()">🖨️ 列印（另存 PDF）</button>
+    <label style="display:inline-flex; align-items:center; gap:6px; font-weight: normal; margin: 0; padding: 8px;">
+      <input type="checkbox" id="show-answers" onchange="renderPaper()"> 顯示答案
+    </label>
+  </div>
+
+  <div id="paper-output"></div>
+</section>
+
+<!-- ============ 設定 ============ -->
+<section id="tab-data" class="tab">
+  <h2>帳號 / 資料</h2>
+  <p>登入帳號：<span id="user-email"></span></p>
+  <button class="btn btn-secondary" onclick="logout()">登出</button>
+
+  <h3>備份</h3>
+  <button class="btn" onclick="exportData()">📤 匯出題庫 (JSON)</button>
+  <label class="btn btn-secondary" style="display:inline-block;">
+    📥 匯入題庫
+    <input type="file" accept=".json" onchange="importData(event)" style="display:none;">
+  </label>
+
+  <h3>範文清單</h3>
+  <p style="font-size: 13px; color: #666;">DSE 12 篇範文已預載，可自訂新增。</p>
+  <div id="source-list" style="margin-top: 8px;"></div>
+  <div class="toolbar">
+    <input type="text" id="new-source" placeholder="新增範文名稱" style="flex: 1;">
+    <button class="btn" onclick="addSource()">新增</button>
+  </div>
+
+  <h3 style="color: #e74c3c;">危險區</h3>
+  <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空所有題目</button>
+</section>
+
+</main>
+
+</div><!-- /app -->
+
+<!-- ========= Firebase 設定 (你需要修改呢段) ========= -->
+<script type="module">
+// ⬇️⬇️⬇️ 將以下 FIREBASE_CONFIG 換成你 Firebase Console 提供嘅 config ⬇️⬇️⬇️
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA_jHKrdxPApu42xHvy7on0HGR80kQk9fI",
+  authDomain: "dse-chinese-99378.firebaseapp.com",
+  projectId: "dse-chinese-99378",
+  storageBucket: "dse-chinese-99378.firebasestorage.app",
+  messagingSenderId: "1074279400925",
+  appId: "1:1074279400925:web:07b61ff15d1a0f3c456234S"
+};
+// ⬆️⬆️⬆️ 改完上面就可以儲存檔案上載 ⬆️⬆️⬆️
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, onSnapshot, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+// 檢查 config 係咪設定咗
+if (FIREBASE_CONFIG.apiKey.startsWith("PASTE_")) {
+  document.getElementById("setup-screen").style.display = "block";
+  throw new Error("Firebase config not set");
+}
+
+const app = initializeApp(FIREBASE_CONFIG);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// 啟用 Firestore 離線快取
+try { await enableIndexedDbPersistence(db); } catch(e) { console.warn("Offline persistence:", e); }
+
+// 暴露俾全域用
+window.firebaseAuth = auth;
+window.firebaseDb = db;
+window.firebaseHelpers = {
+  GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult,
+  signOut, onAuthStateChanged, doc, setDoc, onSnapshot
+};
+
+// 觸發初始化
+window.dispatchEvent(new Event("firebase-ready"));
+</script>
+
+<!-- ========= 主程式邏輯 ========= -->
+<script>
+const DEFAULT_SOURCES = [
+  "論仁、論孝、論君子（《論語》）",
+  "魚我所欲也（《孟子》）",
+  "逍遙遊（節錄）（《莊子》）",
+  "勸學（節錄）（荀子）",
+  "廉頗藺相如列傳（節錄）（司馬遷）",
+  "出師表（諸葛亮）",
+  "師說（韓愈）",
+  "始得西山宴遊記（柳宗元）",
+  "岳陽樓記（范仲淹）",
+  "六國論（蘇洵）",
+  "唐詩三首（山居秋暝／月下獨酌／登樓）",
+  "詞三首（念奴嬌／聲聲慢／青玉案）"
+];
+
+const TYPE_LABELS = {
+  translate: "語譯",
+  judge: "三式判斷題",
+  mc: "多項選擇題",
+  short: "單答題",
+  long: "複答題"
+};
+
+let state = { questions: [], sources: [...DEFAULT_SOURCES] };
+let currentUser = null;
+let userDocRef = null;
+let saveTimer = null;
+let currentPaper = null;
+let unsubscribeSnapshot = null;
+
+// 等 Firebase 載入完
+window.addEventListener("firebase-ready", () => {
+  const { onAuthStateChanged, getRedirectResult } = window.firebaseHelpers;
+  const auth = window.firebaseAuth;
+
+  // 處理 redirect 登入結果（手機用）
+  getRedirectResult(auth).catch(err => console.warn("redirect:", err));
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      currentUser = user;
+      showApp();
+    } else {
+      currentUser = null;
+      showAuth();
+    }
+  });
+});
+
+function showAuth() {
+  document.getElementById("auth-screen").style.display = "flex";
+  document.getElementById("app").style.display = "none";
+}
+
+function showApp() {
+  document.getElementById("auth-screen").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  // 顯示用戶資料
+  document.getElementById("user-info").innerHTML = `
+    ${currentUser.photoURL ? `<img src="${currentUser.photoURL}">` : ""}
+    <span>${currentUser.displayName || currentUser.email}</span>
+  `;
+  document.getElementById("user-email").textContent = currentUser.email;
+
+  // 連接 Firestore 資料
+  const { doc, onSnapshot } = window.firebaseHelpers;
+  const db = window.firebaseDb;
+  userDocRef = doc(db, "users", currentUser.uid, "data", "main");
+
+  if (unsubscribeSnapshot) unsubscribeSnapshot();
+  unsubscribeSnapshot = onSnapshot(userDocRef, snap => {
+    if (snap.exists()) {
+      const data = snap.data();
+      state = {
+        questions: data.questions || [],
+        sources: data.sources && data.sources.length ? data.sources : [...DEFAULT_SOURCES]
+      };
+    } else {
+      // 初次使用，寫入預設值
+      state = { questions: [], sources: [...DEFAULT_SOURCES] };
+      saveToFirestore();
+    }
+    renderAll();
+  }, err => {
+    console.error("Firestore error:", err);
+    alert("讀取資料出錯：" + err.message);
+  });
+}
+
+window.loginWithGoogle = function() {
+  const { GoogleAuthProvider, signInWithPopup, signInWithRedirect } = window.firebaseHelpers;
+  const provider = new GoogleAuthProvider();
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    signInWithRedirect(window.firebaseAuth, provider);
+  } else {
+    signInWithPopup(window.firebaseAuth, provider).catch(err => {
+      alert("登入失敗：" + err.message);
+    });
+  }
+};
+
+window.logout = function() {
+  const { signOut } = window.firebaseHelpers;
+  if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  signOut(window.firebaseAuth);
+};
+
+function saveToFirestore() {
+  if (!userDocRef) return;
+  const status = document.getElementById("sync-status");
+  if (status) { status.textContent = "💾 儲存中…"; status.className = "sync-status saving"; }
+
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const { setDoc } = window.firebaseHelpers;
+    setDoc(userDocRef, state).then(() => {
+      if (status) { status.textContent = "✓ 已同步"; status.className = "sync-status saved"; }
+    }).catch(err => {
+      if (status) { status.textContent = "✗ 儲存失敗"; status.className = "sync-status"; }
+      alert("儲存失敗：" + err.message);
+    });
+  }, 300);
+}
+
+function renderAll() {
+  renderSourceSelects();
+  renderQuestionForm();
+  renderBank();
+  if (document.getElementById("tab-generate").classList.contains("active")) {
+    renderSourceCheckboxes();
+    updateAllocation();
+  }
+  if (document.getElementById("tab-data").classList.contains("active")) {
+    renderSourceList();
+  }
+}
+
+// ============ Tab 切換 ============
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+    if (btn.dataset.tab === "generate") {
+      renderSourceCheckboxes();
+      updateAllocation();
+    }
+    if (btn.dataset.tab === "data") {
+      renderSourceList();
+    }
+  });
+});
+
+// ============ 題目輸入表單 ============
+function renderQuestionForm() {
+  const type = document.getElementById("q-type").value;
+  const form = document.getElementById("q-form");
+  let html = `<label>題目內容</label><textarea id="q-text"></textarea>`;
+
+  if (type === "mc") {
+    html += `
+      <label>選項</label>
+      <div class="options-input"><span>A.</span><input type="text" id="opt-A"></div>
+      <div class="options-input"><span>B.</span><input type="text" id="opt-B"></div>
+      <div class="options-input"><span>C.</span><input type="text" id="opt-C"></div>
+      <div class="options-input"><span>D.</span><input type="text" id="opt-D"></div>
+      <label>正確答案</label>
+      <select id="q-answer">
+        <option value="A">A</option><option value="B">B</option>
+        <option value="C">C</option><option value="D">D</option>
+      </select>
+    `;
+  } else if (type === "judge") {
+    html += `
+      <label>答案</label>
+      <select id="q-answer">
+        <option value="正確">正確</option>
+        <option value="錯誤">錯誤</option>
+        <option value="無從判斷">無從判斷</option>
+      </select>
+    `;
+  } else {
+    html += `<label>參考答案</label><textarea id="q-answer"></textarea>`;
+  }
+
+  form.innerHTML = html;
+}
+
+function clearForm() { renderQuestionForm(); }
+
+function saveQuestion() {
+  const type = document.getElementById("q-type").value;
+  const source = document.getElementById("q-source").value;
+  const text = document.getElementById("q-text").value.trim();
+  if (!text) { alert("請輸入題目內容"); return; }
+
+  const q = { id: Date.now() + "_" + Math.random().toString(36).slice(2,8), type, source, text };
+
+  if (type === "mc") {
+    q.options = {
+      A: document.getElementById("opt-A").value.trim(),
+      B: document.getElementById("opt-B").value.trim(),
+      C: document.getElementById("opt-C").value.trim(),
+      D: document.getElementById("opt-D").value.trim()
+    };
+    q.answer = document.getElementById("q-answer").value;
+    if (!q.options.A || !q.options.B || !q.options.C || !q.options.D) {
+      alert("請填寫所有選項"); return;
+    }
+  } else {
+    q.answer = document.getElementById("q-answer").value.trim();
+    if (!q.answer) { alert("請輸入答案"); return; }
+  }
+
+  state.questions.push(q);
+  saveToFirestore();
+  clearForm();
+  renderBank();
+}
+
+function deleteQuestion(id) {
+  if (!confirm("確定刪除呢條題目？")) return;
+  state.questions = state.questions.filter(q => q.id !== id);
+  saveToFirestore();
+  renderBank();
+}
+
+function renderBank() {
+  const filterSource = document.getElementById("filter-source").value;
+  const filterType = document.getElementById("filter-type").value;
+  let list = state.questions;
+  if (filterSource) list = list.filter(q => q.source === filterSource);
+  if (filterType) list = list.filter(q => q.type === filterType);
+
+  const container = document.getElementById("bank-list");
+  if (list.length === 0) {
+    container.innerHTML = "<p style='color:#888;'>暫無題目</p>";
+  } else {
+    container.innerHTML = list.map(q => `
+      <div class="question-item">
+        <div class="meta">
+          <span class="badge">${TYPE_LABELS[q.type]}</span>
+          <span>${escapeHTML(q.source)}</span>
+        </div>
+        <div>${escapeHTML(q.text)}</div>
+        ${q.type === "mc" ? `<div style="font-size:13px; color:#555; margin-top:4px;">
+          A. ${escapeHTML(q.options.A)} ｜ B. ${escapeHTML(q.options.B)}<br>
+          C. ${escapeHTML(q.options.C)} ｜ D. ${escapeHTML(q.options.D)}
+        </div>` : ""}
+        <div style="font-size:13px; color:#1abc9c; margin-top:4px;">答案：${escapeHTML(q.answer)}</div>
+        <div class="actions">
+          <button onclick="deleteQuestion('${q.id}')">刪除</button>
+        </div>
+      </div>
+    `).join("");
+  }
+  document.getElementById("bank-stats").textContent = `題目總數：${state.questions.length}（顯示 ${list.length} 條）`;
+}
+
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ============ 範文清單 ============
+function renderSourceSelects() {
+  const sel = document.getElementById("q-source");
+  const filter = document.getElementById("filter-source");
+  if (sel) sel.innerHTML = state.sources.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join("");
+  if (filter) filter.innerHTML = `<option value="">全部範文</option>` + state.sources.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join("");
+}
+
+function renderSourceCheckboxes() {
+  const container = document.getElementById("source-checkboxes");
+  container.innerHTML = state.sources.map(s => `
+    <label><input type="checkbox" class="source-cb" value="${escapeHTML(s)}" checked> ${escapeHTML(s)}</label>
+  `).join("");
+  container.querySelectorAll(".source-cb").forEach(cb => cb.addEventListener("change", updateAllocation));
+}
+
+function toggleAllSources(checked) {
+  document.querySelectorAll(".source-cb").forEach(cb => cb.checked = checked);
+  updateAllocation();
+}
+
+function renderSourceList() {
+  const container = document.getElementById("source-list");
+  container.innerHTML = state.sources.map((s, i) => `
+    <div style="padding:8px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+      <span style="flex:1;">${escapeHTML(s)}</span>
+      <button class="btn btn-danger" style="padding:6px 12px; font-size:12px; margin:0;" onclick="deleteSource(${i})">刪除</button>
+    </div>
+  `).join("");
+}
+
+function addSource() {
+  const input = document.getElementById("new-source");
+  const v = input.value.trim();
+  if (!v) return;
+  if (state.sources.includes(v)) { alert("已存在"); return; }
+  state.sources.push(v);
+  saveToFirestore();
+  input.value = "";
+  renderSourceSelects();
+  renderSourceList();
+}
+
+function deleteSource(i) {
+  if (!confirm("確定刪除？已有題目唔會被刪除，但會搵唔到對應範文。")) return;
+  state.sources.splice(i, 1);
+  saveToFirestore();
+  renderSourceSelects();
+  renderSourceList();
+}
+
+// ============ 出卷 ============
+function getSelectedSources() {
+  return Array.from(document.querySelectorAll(".source-cb:checked")).map(cb => cb.value);
+}
+
+function updateAllocation() {
+  const sources = getSelectedSources();
+  let total = 0;
+  document.querySelectorAll("#mark-allocation tr").forEach(tr => {
+    const type = tr.dataset.type;
+    const [countInput, marksInput] = tr.querySelectorAll("input");
+    const count = parseInt(countInput.value) || 0;
+    const marks = parseInt(marksInput.value) || 0;
+    const subtotal = count * marks;
+    tr.querySelector(".subtotal").textContent = subtotal;
+    const available = state.questions.filter(q => q.type === type && sources.includes(q.source)).length;
+    const cell = tr.querySelector(".available");
+    cell.textContent = available;
+    cell.style.color = available < count ? "#e74c3c" : "#27ae60";
+    total += subtotal;
+  });
+  document.getElementById("total-marks").textContent = total;
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function generatePaper() {
+  const sources = getSelectedSources();
+  if (sources.length === 0) { alert("請至少選擇一篇範文"); return; }
+
+  const sections = [];
+  let insufficient = [];
+
+  document.querySelectorAll("#mark-allocation tr").forEach(tr => {
+    const type = tr.dataset.type;
+    const [countInput, marksInput] = tr.querySelectorAll("input");
+    const count = parseInt(countInput.value) || 0;
+    const marks = parseInt(marksInput.value) || 0;
+    if (count === 0) return;
+
+    const pool = state.questions.filter(q => q.type === type && sources.includes(q.source));
+    if (pool.length < count) {
+      insufficient.push(`${TYPE_LABELS[type]}（需要 ${count}，題庫只有 ${pool.length}）`);
+    }
+    const picked = shuffle(pool).slice(0, count);
+    sections.push({ type, marks, questions: picked });
+  });
+
+  if (insufficient.length > 0) {
+    if (!confirm("以下題型題目不足：\n" + insufficient.join("\n") + "\n\n仍然繼續？")) return;
+  }
+
+  currentPaper = { title: document.getElementById("paper-title").value, sections };
+  renderPaper();
+}
+
+function renderPaper() {
+  if (!currentPaper) {
+    document.getElementById("paper-output").innerHTML = "<p style='color:#888;'>請設定後按「隨機抽題生成試卷」</p>";
+    return;
+  }
+  const showAns = document.getElementById("show-answers").checked;
+  const p = currentPaper;
+  const totalMarks = p.sections.reduce((s, sec) => s + sec.marks * sec.questions.length, 0);
+
+  let html = `
+    <div class="paper-header">
+      <h1>${escapeHTML(p.title)}</h1>
+      <div class="paper-info">
+        <span>姓名：__________________</span>
+        <span>班別：__________</span>
+        <span>日期：__________</span>
+        <span>分數：______ / ${totalMarks}</span>
+      </div>
+    </div>
+  `;
+
+  let secNum = 0;
+  p.sections.forEach(sec => {
+    secNum++;
+    html += `<div class="paper-section"><h2>${chineseNum(secNum)}、${TYPE_LABELS[sec.type]}（每題 ${sec.marks} 分，共 ${sec.marks * sec.questions.length} 分）</h2>`;
+    sec.questions.forEach((q, i) => {
+      html += `<div class="paper-question">
+        <span class="q-num">${i+1}.</span> ${escapeHTML(q.text)}
+        <span class="q-marks">(${sec.marks}分)</span>
+        <div style="font-size:12px; color:#888;">〔出處：${escapeHTML(q.source)}〕</div>`;
+
+      if (q.type === "mc") {
+        html += `<div class="paper-options">
+          <div>A. ${escapeHTML(q.options.A)}</div>
+          <div>B. ${escapeHTML(q.options.B)}</div>
+          <div>C. ${escapeHTML(q.options.C)}</div>
+          <div>D. ${escapeHTML(q.options.D)}</div>
+          <div style="margin-top:6px;">答：（　　）</div>
+        </div>`;
+      } else if (q.type === "judge") {
+        html += `<div style="margin-top:6px;">答：（　　　　　　）<span style="font-size:12px; color:#888; margin-left:8px;">（正確／錯誤／無從判斷）</span></div>`;
+      } else if (q.type === "translate" || q.type === "short") {
+        html += `<div class="paper-answer-space"></div><div class="paper-answer-space"></div>`;
+      } else if (q.type === "long") {
+        for (let k=0; k<5; k++) html += `<div class="paper-answer-space"></div>`;
+      }
+
+      if (showAns) {
+        html += `<div style="background:#fffbe6; padding:6px 10px; margin-top:6px; border-left:3px solid #f39c12;">
+          <strong>答案：</strong>${escapeHTML(q.answer)}
+        </div>`;
+      }
+      html += `</div>`;
+    });
+    html += `</div>`;
+  });
+
+  document.getElementById("paper-output").innerHTML = html;
+}
+
+function chineseNum(n) { return "一二三四五六七八九十".charAt(n-1) || n; }
+
+// ============ 備份 ============
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `中文題庫備份_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.questions || !data.sources) throw new Error("格式錯誤");
+      if (!confirm(`將匯入 ${data.questions.length} 條題目，覆蓋現有資料？`)) return;
+      state = data;
+      saveToFirestore();
+      renderAll();
+      alert("匯入成功");
+    } catch (err) {
+      alert("匯入失敗：" + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearAllData() {
+  if (!confirm("確定清空所有題目？")) return;
+  if (!confirm("呢個操作無法復原，再次確認？")) return;
+  state = { questions: [], sources: [...DEFAULT_SOURCES] };
+  saveToFirestore();
+  renderAll();
+}
+
+// 暴露俾 HTML onclick 用
+window.saveQuestion = saveQuestion;
+window.clearForm = clearForm;
+window.deleteQuestion = deleteQuestion;
+window.renderQuestionForm = renderQuestionForm;
+window.renderBank = renderBank;
+window.toggleAllSources = toggleAllSources;
+window.updateAllocation = updateAllocation;
+window.generatePaper = generatePaper;
+window.renderPaper = renderPaper;
+window.exportData = exportData;
+window.importData = importData;
+window.clearAllData = clearAllData;
+window.addSource = addSource;
+window.deleteSource = deleteSource;
+</script>
+
+</body>
+</html>
