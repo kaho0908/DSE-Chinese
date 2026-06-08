@@ -157,6 +157,7 @@
   <div id="user-info"></div>
   <nav class="no-print">
     <button class="tab-btn active" data-tab="bank">題庫管理</button>
+    <button class="tab-btn" data-tab="import">批量輸入</button>
     <button class="tab-btn" data-tab="generate">出卷</button>
     <button class="tab-btn" data-tab="data">設定</button>
   </nav>
@@ -201,6 +202,33 @@
     </select>
   </div>
   <div id="bank-list"></div>
+</section>
+
+<!-- ============ 批量輸入 ============ -->
+<section id="tab-import" class="tab">
+  <h2>批量輸入題目</h2>
+
+  <details style="background:#eaf6fb; border:1px solid #3498db; padding:12px; border-radius:6px; margin-bottom:16px;">
+    <summary style="cursor:pointer; font-weight:600; color:#2c3e50;">📋 點樣用 AI（ChatGPT / Claude / Gemini）幫你提取題目？（撳開睇）</summary>
+    <div style="margin-top:12px;">
+      <p>將你嘅 TXT 題庫檔案上傳到 ChatGPT / Claude / Gemini，然後將以下指令連同檔案一齊發送：</p>
+      <textarea id="ai-prompt" readonly style="background:white; font-size:13px; min-height:280px;"></textarea>
+      <button class="btn" onclick="copyPrompt()">📋 複製指令</button>
+      <p style="font-size:13px; color:#555; margin-top:8px;">AI 會輸出格式化嘅題目，將佢 copy 返嚟落面個輸入框就可以批量匯入。</p>
+    </div>
+  </details>
+
+  <h3>貼上格式化題目</h3>
+  <p style="font-size:13px; color:#666;">每條題目用 <code>===</code> 分隔。格式範例可以撳「載入範例」。</p>
+  <textarea id="bulk-input" style="min-height:300px; font-family: 'Courier New', monospace; font-size:13px;" placeholder="貼入 AI 輸出嘅格式化題目..."></textarea>
+
+  <div class="toolbar">
+    <button class="btn" onclick="previewBulk()">🔍 預覽解析結果</button>
+    <button class="btn btn-secondary" onclick="loadSample()">📄 載入範例</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('bulk-input').value=''">清空</button>
+  </div>
+
+  <div id="bulk-preview" style="margin-top:16px;"></div>
 </section>
 
 <!-- ============ 出卷 ============ -->
@@ -316,7 +344,7 @@ const FIREBASE_CONFIG = {
   projectId: "dse-chinese-99378",
   storageBucket: "dse-chinese-99378.firebasestorage.app",
   messagingSenderId: "1074279400925",
-  appId: "1:1074279400925:web:07b61ff15d1a0f3c456234S"
+  appId: "1:1074279400925:web:07b61ff15d1a0f3c456234"
 };
 // ⬆️⬆️⬆️ 改完上面就可以儲存檔案上載 ⬆️⬆️⬆️
 
@@ -832,6 +860,269 @@ function clearAllData() {
   renderAll();
 }
 
+// ============ 批量輸入 ============
+const AI_PROMPT = `以下係我嘅中文範文題目文件，請你幫我提取入面嘅每條題目同答案，按指定格式輸出，用嚟匯入到題庫工具。
+
+【輸出格式】
+每條題目用 === 分隔，每條包含以下欄位：
+範文: <範文名>
+題型: <語譯 / 判斷 / 多選 / 單答 / 複答>
+題目: <題目內容>
+答案: <答案>
+
+如果係「多選」題，仲要加入：
+A: <選項A>
+B: <選項B>
+C: <選項C>
+D: <選項D>
+（答案欄淨係填字母，例如 B）
+
+如果係「判斷」題，答案欄淨係可以係：正確 / 錯誤 / 無從判斷
+
+【嚴格要求】
+1. 唔好加任何解釋文字，淨係輸出格式化嘅題目
+2. 題型必須係：語譯、判斷、多選、單答、複答 五者之一
+3. 題目同答案保持原文（繁體中文）
+4. 如果文件冇明確標明範文，根據題目內容判斷出處
+5. 多行內容（例如長答案）直接寫，唔需要加引號或縮排
+
+【正確格式範例】
+===
+範文: 出師表
+題型: 語譯
+題目: 先帝創業未半而中道崩殂
+答案: 先帝開創帝業還沒有完成一半就中途死去
+
+===
+範文: 論仁、論孝、論君子（《論語》）
+題型: 多選
+題目: 「君子不器」嘅意思係？
+A: 君子唔應該做工具
+B: 君子唔限於某一才能
+C: 君子要學識多種樂器
+D: 君子唔需要器皿
+答案: B
+
+===
+範文: 魚我所欲也（《孟子》）
+題型: 判斷
+題目: 孟子認為「捨生取義」係人皆有之嘅本心。
+答案: 正確
+
+【我嘅題目文件】
+（將你嘅 TXT 內容貼喺呢度，或者直接上傳檔案）`;
+
+// 載入指令範本
+setTimeout(() => {
+  const ta = document.getElementById("ai-prompt");
+  if (ta) ta.value = AI_PROMPT;
+}, 100);
+
+function copyPrompt() {
+  const ta = document.getElementById("ai-prompt");
+  ta.select();
+  document.execCommand("copy");
+  alert("已複製！可以貼去 ChatGPT / Claude / Gemini");
+}
+
+function loadSample() {
+  document.getElementById("bulk-input").value = `===
+範文: 出師表（諸葛亮）
+題型: 語譯
+題目: 先帝創業未半而中道崩殂
+答案: 先帝開創帝業還沒有完成一半就中途死去
+
+===
+範文: 出師表（諸葛亮）
+題型: 多選
+題目: 「鞠躬盡瘁」嘅「鞠躬」意思最接近？
+A: 彎腰行禮
+B: 竭盡心力
+C: 親自處理
+D: 退休歸隱
+答案: B
+
+===
+範文: 論仁、論孝、論君子（《論語》）
+題型: 判斷
+題目: 孔子認為「君子不器」即係君子唔應該做工具人。
+答案: 錯誤
+
+===
+範文: 魚我所欲也（《孟子》）
+題型: 單答
+題目: 孟子用咩比喻嚟說明「捨生取義」？
+答案: 用「魚」同「熊掌」嘅取捨作比喻
+
+===
+範文: 岳陽樓記（范仲淹）
+題型: 複答
+題目: 試解釋「先天下之憂而憂，後天下之樂而樂」嘅含義，並分析其體現嘅思想。
+答案: 含義：在天下人擔憂之前已經先擔憂，在天下人享樂之後先享樂。體現作者以天下為己任、心繫蒼生嘅儒家士大夫情懷，亦反映「仁者」嘅人生境界。`;
+}
+
+function normalizeType(t) {
+  t = t.trim();
+  const map = {
+    "語譯": "translate", "translate": "translate", "translation": "translate",
+    "判斷": "judge", "三式判斷": "judge", "三式判斷題": "judge", "judge": "judge",
+    "多選": "mc", "多項選擇": "mc", "多項選擇題": "mc", "MC": "mc", "mc": "mc",
+    "單答": "short", "單答題": "short", "短答": "short", "short": "short",
+    "複答": "long", "複答題": "long", "長答": "long", "long": "long"
+  };
+  return map[t] || null;
+}
+
+function parseBulk(text) {
+  const blocks = text.split(/^\s*={3,}\s*$/m).map(b => b.trim()).filter(b => b);
+  const questions = [];
+  const errors = [];
+
+  blocks.forEach((block, idx) => {
+    const blockNum = idx + 1;
+    // 解析 key: value（支援多行 value）
+    const lines = block.split(/\r?\n/);
+    const fields = {};
+    let currentKey = null;
+    const fieldKeys = ["範文", "題型", "題目", "答案", "A", "B", "C", "D"];
+
+    for (let line of lines) {
+      const m = line.match(/^(範文|題型|題目|答案|A|B|C|D)\s*[:：]\s*(.*)$/);
+      if (m && fieldKeys.includes(m[1])) {
+        currentKey = m[1];
+        fields[currentKey] = m[2];
+      } else if (currentKey) {
+        // 接續多行 value
+        fields[currentKey] += "\n" + line;
+      }
+    }
+
+    // 整理 + 驗證
+    Object.keys(fields).forEach(k => fields[k] = fields[k].trim());
+
+    if (!fields["範文"]) { errors.push(`第 ${blockNum} 條：缺少「範文」`); return; }
+    if (!fields["題型"]) { errors.push(`第 ${blockNum} 條：缺少「題型」`); return; }
+    if (!fields["題目"]) { errors.push(`第 ${blockNum} 條：缺少「題目」`); return; }
+    if (!fields["答案"]) { errors.push(`第 ${blockNum} 條：缺少「答案」`); return; }
+
+    const type = normalizeType(fields["題型"]);
+    if (!type) { errors.push(`第 ${blockNum} 條：題型「${fields["題型"]}」無效（應為 語譯/判斷/多選/單答/複答）`); return; }
+
+    const q = {
+      id: Date.now() + "_" + Math.random().toString(36).slice(2,8) + "_" + idx,
+      type,
+      source: fields["範文"],
+      text: fields["題目"],
+      answer: fields["答案"]
+    };
+
+    if (type === "mc") {
+      if (!fields["A"] || !fields["B"] || !fields["C"] || !fields["D"]) {
+        errors.push(`第 ${blockNum} 條（多選）：缺少選項 A/B/C/D`); return;
+      }
+      if (!/^[ABCD]$/.test(q.answer)) {
+        errors.push(`第 ${blockNum} 條（多選）：答案必須係 A/B/C/D，而家係「${q.answer}」`); return;
+      }
+      q.options = { A: fields["A"], B: fields["B"], C: fields["C"], D: fields["D"] };
+    }
+
+    if (type === "judge") {
+      if (!["正確", "錯誤", "無從判斷"].includes(q.answer)) {
+        errors.push(`第 ${blockNum} 條（判斷）：答案必須係「正確 / 錯誤 / 無從判斷」，而家係「${q.answer}」`); return;
+      }
+    }
+
+    questions.push(q);
+  });
+
+  return { questions, errors };
+}
+
+function previewBulk() {
+  const text = document.getElementById("bulk-input").value.trim();
+  if (!text) { alert("請先貼入題目"); return; }
+
+  const { questions, errors } = parseBulk(text);
+  const container = document.getElementById("bulk-preview");
+
+  // 偵測新範文
+  const newSources = [...new Set(questions.map(q => q.source))].filter(s => !state.sources.includes(s));
+
+  let html = `<div style="background:#ecf0f1; padding:12px; border-radius:4px; margin-bottom:12px;">
+    <strong>解析結果：</strong>
+    成功 ${questions.length} 條，失敗 ${errors.length} 條
+  </div>`;
+
+  if (errors.length > 0) {
+    html += `<div style="background:#fdecea; border-left:4px solid #e74c3c; padding:12px; margin-bottom:12px;">
+      <strong style="color:#c0392b;">⚠️ 錯誤（呢啲題目會被略過）：</strong>
+      <ul style="margin:8px 0; padding-left:20px;">
+        ${errors.map(e => `<li>${escapeHTML(e)}</li>`).join("")}
+      </ul>
+    </div>`;
+  }
+
+  if (newSources.length > 0) {
+    html += `<div style="background:#fff3cd; border-left:4px solid #f39c12; padding:12px; margin-bottom:12px;">
+      <strong>📌 將會新增以下範文到範文清單：</strong>
+      <ul style="margin:8px 0; padding-left:20px;">
+        ${newSources.map(s => `<li>${escapeHTML(s)}</li>`).join("")}
+      </ul>
+    </div>`;
+  }
+
+  if (questions.length > 0) {
+    html += `<h3>預覽（顯示頭 5 條）</h3>`;
+    questions.slice(0, 5).forEach((q, i) => {
+      html += `<div class="question-item">
+        <div class="meta">
+          <span class="badge">${TYPE_LABELS[q.type]}</span>
+          <span>${escapeHTML(q.source)}</span>
+        </div>
+        <div>${escapeHTML(q.text)}</div>
+        ${q.type === "mc" ? `<div style="font-size:13px; color:#555; margin-top:4px;">
+          A. ${escapeHTML(q.options.A)} ｜ B. ${escapeHTML(q.options.B)}<br>
+          C. ${escapeHTML(q.options.C)} ｜ D. ${escapeHTML(q.options.D)}
+        </div>` : ""}
+        <div style="font-size:13px; color:#1abc9c; margin-top:4px;">答案：${escapeHTML(q.answer)}</div>
+      </div>`;
+    });
+    if (questions.length > 5) {
+      html += `<p style="color:#666;">... 仲有 ${questions.length - 5} 條（成功匯入會全部入晒）</p>`;
+    }
+
+    html += `<button class="btn" onclick="importBulk()" style="margin-top:12px;">✅ 確認匯入 ${questions.length} 條題目</button>`;
+  }
+
+  container.innerHTML = html;
+  // 暫存解析結果
+  window._bulkParsed = { questions, newSources };
+}
+
+function importBulk() {
+  if (!window._bulkParsed || window._bulkParsed.questions.length === 0) {
+    alert("冇可匯入嘅題目");
+    return;
+  }
+  const { questions, newSources } = window._bulkParsed;
+  if (!confirm(`確認匯入 ${questions.length} 條題目？\n（會新增 ${newSources.length} 個新範文）`)) return;
+
+  // 新增範文
+  newSources.forEach(s => {
+    if (!state.sources.includes(s)) state.sources.push(s);
+  });
+  // 加入題目
+  state.questions.push(...questions);
+  saveToFirestore();
+  renderAll();
+
+  document.getElementById("bulk-input").value = "";
+  document.getElementById("bulk-preview").innerHTML = `<div style="background:#d4efdf; border-left:4px solid #27ae60; padding:12px;">
+    ✅ 成功匯入 ${questions.length} 條題目！可以去「題庫管理」或「出卷」頁查看。
+  </div>`;
+  window._bulkParsed = null;
+}
+
 // 暴露俾 HTML onclick 用
 window.saveQuestion = saveQuestion;
 window.clearForm = clearForm;
@@ -847,6 +1138,10 @@ window.importData = importData;
 window.clearAllData = clearAllData;
 window.addSource = addSource;
 window.deleteSource = deleteSource;
+window.copyPrompt = copyPrompt;
+window.loadSample = loadSample;
+window.previewBulk = previewBulk;
+window.importBulk = importBulk;
 </script>
 
 </body>
